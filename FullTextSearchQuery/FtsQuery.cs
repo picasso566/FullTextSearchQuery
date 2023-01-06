@@ -14,6 +14,7 @@ namespace SoftCircuits.FullTextSearchQuery
     internal enum TermForm
     {
         Inflectional,
+        ForcedInflectional,
         Thesaurus,
         Literal,
     }
@@ -50,8 +51,12 @@ namespace SoftCircuits.FullTextSearchQuery
     /// </remarks>
     public class FtsQuery
     {
-        // Characters not allowed in unquoted search terms
-        protected static readonly string Punctuation = "~\"`!@#$%^&*()-+=[]{}\\|;:,.<>?/";
+        // Characters not allowed in unquoted search terms, used by the parser to find the beginning of a sql term.
+        protected static string PrePunctuation = "~\"`!@#$%^&*()-+=[]{}\\|;:,.<>?/";
+
+        // Set of characters not allowed in the actual search term, unless it's a literal
+        protected static string Punctuation = "~\"`!@$%&()[]{}\\|;:,<>?/";
+
 
         // Assume that if there are no quotes around the term, then it is an inflectional form
         public bool DefaultToInflectional { get; set; } = true;
@@ -133,7 +138,7 @@ namespace SoftCircuits.FullTextSearchQuery
                 {
                     // Reset modifiers
                     conjunction = defaultConjunction;
-                    termForm = (DefaultToInflectional) ? TermForm.Inflectional : TermForm.Literal;
+                    termForm = TermForm.Inflectional;
                     termExclude = false;
                     resetState = false;
                 }
@@ -143,7 +148,7 @@ namespace SoftCircuits.FullTextSearchQuery
                     break;
 
                 char ch = parser.Peek();
-                if (Punctuation.Contains(ch))
+                if (PrePunctuation.Contains(ch))
                 {
                     switch (ch)
                     {
@@ -181,6 +186,11 @@ namespace SoftCircuits.FullTextSearchQuery
                             // Match synonyms of next term
                             termForm = TermForm.Thesaurus;
                             break;
+                        case '?':
+                            // Match inflectional of next term
+                            if (!DefaultToInflectional)
+                                termForm = TermForm.ForcedInflectional;
+                            break;
                         default:
                             break;
                     }
@@ -189,16 +199,31 @@ namespace SoftCircuits.FullTextSearchQuery
                 }
                 else
                 {
-                    // Parse this query term
-                    term = parser.ParseWhile(c => !Punctuation.Contains(c) && !char.IsWhiteSpace(c));
 
-                    // Allow trailing wildcard
-                    if (parser.Peek() == '*')
-                    {
-                        term += parser.Peek();
-                        parser.MoveAhead();
+                    // Add term to expression tree, default to appropriate term form
+                    if (!DefaultToInflectional && termForm != TermForm.ForcedInflectional)
                         termForm = TermForm.Literal;
+
+                    if (termForm == TermForm.Literal)
+                    {
+                        // Parse this query term
+                        term = parser.ParseWhile(c => !Punctuation.Contains(c) && !char.IsWhiteSpace(c));
                     }
+                    else
+                    {
+                        // Parse this query term
+                        term = parser.ParseWhile(c => !PrePunctuation.Contains(c) && !char.IsWhiteSpace(c));
+
+                        // Allow trailing wildcard
+                        if (parser.Peek() == '*')
+                        {
+                            term += parser.Peek();
+                            parser.MoveAhead();
+                            termForm = TermForm.Literal;
+                        }
+                    }
+
+
 
                     // Interpret term
                     StringComparer comparer = StringComparer.OrdinalIgnoreCase;
@@ -212,6 +237,8 @@ namespace SoftCircuits.FullTextSearchQuery
                         termExclude = true;
                     else
                     {
+
+
                         root = AddNode(root, term, termForm, termExclude, conjunction);
                         resetState = true;
                     }

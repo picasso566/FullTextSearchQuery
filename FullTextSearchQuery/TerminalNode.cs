@@ -21,6 +21,7 @@ namespace SoftCircuits.FullTextSearchQuery
 
         private static readonly Dictionary<TermForm, string> TermFormatLookup = new Dictionary<TermForm, string>
         {
+            [TermForm.ForcedInflectional] = "{0}FORMSOF(INFLECTIONAL, {1})",
             [TermForm.Inflectional] = "{0}FORMSOF(INFLECTIONAL, {1})",
             [TermForm.Thesaurus] = "{0}FORMSOF(THESAURUS, {1})",
             [TermForm.Literal] = "{0}\"{1}\"",

@@ -37,6 +37,20 @@ namespace Fts.Test
         }
 
         [TestMethod]
+        public void DefaultToLiteralTests()
+        {
+            FtsQuery query = new FtsQuery(true, defaultToInflectional: false);
+
+            Assert.AreEqual("\"abc\" AND \"efg\"", query.Transform("abc and efg"));
+            Assert.AreEqual("(\"abc\" AND \"efg\") OR \"xyz\"", query.Transform(" (abc  and  efg ) or xyz"));
+            Assert.AreEqual("\"abc\" NEAR \"efg\" AND \"xyz\"", query.Transform(" <+abc  +efg> and xyz"));
+            Assert.AreEqual("FORMSOF(INFLECTIONAL, java) OR \"c++\"", query.Transform(" ?java or c++"));
+            Assert.AreEqual("FORMSOF(INFLECTIONAL, abc) AND FORMSOF(INFLECTIONAL, def)", query.Transform(" ?abc ?def"));
+            Assert.AreEqual("FORMSOF(INFLECTIONAL, abc) AND (FORMSOF(INFLECTIONAL, def) OR FORMSOF(INFLECTIONAL, xyz))", query.Transform("?abc and ( ?def or ?xyz)"));
+        }
+
+
+        [TestMethod]
         public void FixupTests()
         {
             FtsQuery query = new FtsQuery(true);
